@@ -5,34 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Download, Play, FileIcon, FileVideo, FileImage, FileArchive, ClipboardPaste, Link2, Loader2, Info } from 'lucide-react';
 
-const getDummyData = (url: string) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (url.includes('error')) reject(new Error('Format URL tidak valid'));
-      
-      // Determine dummy type based on URL input
-      let filetype = 'document';
-      let filename = 'TERABOX_Document_1024.pdf';
-      if (url.includes('video')) {
-        filetype = 'video';
-        filename = 'Avenger_Endgame_1080p.mp4';
-      } else if (url.includes('image')) {
-        filetype = 'image';
-        filename = 'Wallpaper_4K_Abstract.png';
-      } else if (url.includes('zip')) {
-        filetype = 'archive';
-        filename = 'Project_Source_Code.zip';
-      }
-
-      resolve({
-        filename,
-        filesize: '2.5 GB',
-        filetype,
-        directUrl: '#',
-      });
-    }, 2000);
-  });
-};
+// Backend connection now handled in handleSubmit
 
 const getFileIcon = (type: string) => {
   switch (type) {
@@ -66,8 +39,28 @@ export default function Home() {
     setData(null);
 
     try {
-      const result = await getDummyData(url);
-      setData(result);
+      const response = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Terjadi kesalahan saat memproses link.');
+      }
+
+      const proxyUrl = result.dlink 
+        ? `/api/download?url=${encodeURIComponent(result.dlink)}&filename=${encodeURIComponent(result.filename)}`
+        : url;
+
+      setData({
+        filename: result.filename,
+        filesize: result.size,
+        filetype: result.fileType,
+        directUrl: proxyUrl,
+      });
       setStatus('success');
       toast.success('File berhasil diekstrak!');
     } catch (err: any) {
