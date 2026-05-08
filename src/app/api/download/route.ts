@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server';
 
-// Optional: Force Edge Runtime for better stream handling performance and compatibility as requested
 export const runtime = 'edge';
+
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Upgrade-Insecure-Requests": "1",
+  "Referer": "https://www.terabox.com/"
+};
 
 export async function GET(req: Request) {
   try {
@@ -20,18 +31,39 @@ export async function GET(req: Request) {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch(decodedUrl, {
-        headers: {
-          'Referer': 'https://www.terabox.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        },
-        signal: controller.signal,
-      });
+      let currentUrl = decodedUrl;
+      let response: Response | null = null;
+      let redirectCount = 0;
+      const MAX_REDIRECTS = 5;
+
+      while (redirectCount < MAX_REDIRECTS) {
+        response = await fetch(currentUrl, {
+          headers: HEADERS,
+          signal: controller.signal,
+          redirect: 'manual', // Manual follow redirect
+        });
+
+        // Cek apakah response berupa redirect
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get('location');
+          if (!location) {
+            break; // Tidak ada location, kita stop
+          }
+          // Handle path relative
+          currentUrl = new URL(location, currentUrl).toString();
+          redirectCount++;
+        } else {
+          break; // Bukan redirect, stop loop
+        }
+      }
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        return NextResponse.json({ error: `Gagal fetch dari upstream (Status: ${response.status})` }, { status: response.status });
+      if (!response || !response.ok) {
+        return NextResponse.json(
+          { error: `Gagal fetch dari upstream (Status: ${response ? response.status : 'Unknown'})` }, 
+          { status: response ? response.status : 500 }
+        );
       }
 
       const headers = new Headers();
