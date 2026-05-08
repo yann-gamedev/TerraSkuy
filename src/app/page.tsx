@@ -51,15 +51,20 @@ export default function Home() {
         throw new Error(result.error || 'Terjadi kesalahan saat memproses link.');
       }
 
-      const proxyUrl = result.dlink 
+      const downloadUrl = result.dlink 
         ? `/api/download?url=${encodeURIComponent(result.dlink)}&filename=${encodeURIComponent(result.filename)}`
+        : url;
+
+      const previewUrl = result.dlink 
+        ? `/api/preview?url=${encodeURIComponent(result.dlink)}&filename=${encodeURIComponent(result.filename)}`
         : url;
 
       setData({
         filename: result.filename,
         filesize: result.size,
         filetype: result.fileType,
-        directUrl: proxyUrl,
+        downloadUrl,
+        previewUrl,
       });
       setStatus('success');
       toast.success('File berhasil diekstrak!');
@@ -163,7 +168,7 @@ export default function Home() {
 
                   <div className="flex gap-3">
                     <a
-                      href={data.directUrl}
+                      href={data.downloadUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 hover:text-blue-300 border border-blue-500/20 transition-all font-medium text-sm"
@@ -173,10 +178,15 @@ export default function Home() {
                     </a>
                     
                     {data.filetype === 'video' && (
-                      <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 hover:text-purple-300 border border-purple-500/20 transition-all font-medium text-sm">
+                      <a 
+                        href={data.previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 hover:text-purple-300 border border-purple-500/20 transition-all font-medium text-sm"
+                      >
                         <Play className="w-4 h-4" />
                         Preview
-                      </button>
+                      </a>
                     )}
                   </div>
                 </div>

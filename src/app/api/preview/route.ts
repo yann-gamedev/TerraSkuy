@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const url = searchParams.get('url');
-    const filename = searchParams.get('filename') || 'downloaded_file';
+    const filename = searchParams.get('filename') || 'preview_file';
 
     if (!url) {
       return NextResponse.json({ error: 'Parameter url (direct link) diperlukan' }, { status: 400 });
@@ -69,7 +69,10 @@ export async function GET(req: Request) {
       const headers = new Headers();
       // Ensure safe filename format
       const safeFilename = filename.replace(/["\\]/g, '');
-      headers.set('Content-Disposition', `attachment; filename="${safeFilename}"`);
+      
+      // PERBEDAAN UNTUK PREVIEW: Inline dan Accept-Ranges
+      headers.set('Content-Disposition', `inline; filename="${safeFilename}"`);
+      headers.set('Accept-Ranges', 'bytes');
       
       const contentType = response.headers.get('content-type');
       if (contentType) {
@@ -98,7 +101,7 @@ export async function GET(req: Request) {
     }
 
   } catch (error: any) {
-    console.error('Download Proxy Error:', error);
+    console.error('Preview Proxy Error:', error);
     return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
   }
 }
