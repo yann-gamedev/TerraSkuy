@@ -3,9 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { Download, Play, FileIcon, FileVideo, FileImage, FileArchive, ClipboardPaste, Link2, Loader2, Info } from 'lucide-react';
-
-// Backend connection now handled in handleSubmit
+import { Download, Play, FileIcon, FileVideo, FileImage, FileArchive, ClipboardPaste, Link2, Loader2, Info, ExternalLink, AlertTriangle, RotateCcw } from 'lucide-react';
 
 const getFileIcon = (type: string) => {
   switch (type) {
@@ -16,10 +14,22 @@ const getFileIcon = (type: string) => {
   }
 };
 
+type FileData = {
+  filename: string;
+  filesize: string;
+  filetype: string;
+  downloadUrl: string | null;
+  previewUrl: string | null;
+  directDownload: boolean;
+  originalUrl: string;
+  thumbnail: string | null;
+};
+
 export default function Home() {
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [data, setData] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [data, setData] = useState<FileData | null>(null);
 
   const handlePaste = async () => {
     try {
@@ -27,8 +37,15 @@ export default function Home() {
       setUrl(text);
       toast.success('URL berhasil ditempel!');
     } catch (err) {
-      toast.error('Gagal mengakses clipboard. Coba gunakan Ctrl+V atau Paste manual.');
+      toast.error('Gagal mengakses clipboard. Coba paste manual.');
     }
+  };
+
+  const handleReset = () => {
+    setStatus('idle');
+    setData(null);
+    setErrorMsg('');
+    setUrl('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,6 +54,7 @@ export default function Home() {
     
     setStatus('loading');
     setData(null);
+    setErrorMsg('');
 
     try {
       const response = await fetch('/api/extract', {
@@ -53,11 +71,11 @@ export default function Home() {
 
       const downloadUrl = result.dlink 
         ? `/api/download?url=${encodeURIComponent(result.dlink)}&filename=${encodeURIComponent(result.filename)}`
-        : url;
+        : null;
 
       const previewUrl = result.dlink 
         ? `/api/preview?url=${encodeURIComponent(result.dlink)}&filename=${encodeURIComponent(result.filename)}`
-        : url;
+        : null;
 
       setData({
         filename: result.filename,
@@ -65,18 +83,26 @@ export default function Home() {
         filetype: result.fileType,
         downloadUrl,
         previewUrl,
+        directDownload: result.directDownload,
+        originalUrl: result.originalUrl || url,
+        thumbnail: result.thumbnail,
       });
       setStatus('success');
-      toast.success('File berhasil diekstrak!');
+
+      if (result.directDownload) {
+        toast.success('File berhasil diekstrak! Siap download.');
+      } else {
+        toast.info('File ditemukan. Download langsung memerlukan login Terabox.');
+      }
     } catch (err: any) {
       setStatus('error');
+      setErrorMsg(err.message || 'Gagal mengekstrak URL.');
       toast.error(err.message || 'Gagal mengekstrak URL.');
     }
   };
 
   return (
     <main className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-[#0a0a0a] text-white">
-      {/* Background Gradients */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-600/20 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-purple-600/20 blur-[120px] pointer-events-none" />
 
@@ -144,7 +170,33 @@ export default function Home() {
             </button>
           </form>
 
-          {/* Result Card with AnimatePresence */}
+          {/* Error State */}
+          <AnimatePresence>
+            {status === 'error' && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginTop: 24 }}
+                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-300">{errorMsg}</p>
+                  </div>
+                  <button
+                    onClick={handleReset}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all text-sm font-medium"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Coba URL Lain
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Result Card */}
           <AnimatePresence>
             {status === 'success' && data && (
               <motion.div
@@ -154,6 +206,7 @@ export default function Home() {
                 className="overflow-hidden"
               >
                 <div className="bg-black/40 border border-white/5 rounded-2xl p-5 space-y-5">
+                  {/* File Info */}
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-white/5 rounded-xl border border-white/10 shrink-0">
                       {getFileIcon(data.filetype)}
@@ -166,29 +219,65 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    <a
-                      href={data.downloadUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 hover:text-blue-300 border border-blue-500/20 transition-all font-medium text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </a>
-                    
-                    {data.filetype === 'video' && (
+                  {/* Direct download available */}
+                  {data.directDownload && data.downloadUrl && (
+                    <div className="flex gap-3">
+                      <a
+                        href={data.downloadUrl}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 hover:text-blue-300 border border-blue-500/20 transition-all font-medium text-sm"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download
+                      </a>
+                      
+                      {data.filetype === 'video' && data.previewUrl && (
+                        <a 
+                          href={data.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 hover:text-purple-300 border border-purple-500/20 transition-all font-medium text-sm"
+                        >
+                          <Play className="w-4 h-4" />
+                          Preview
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Direct download NOT available — show explanation + manual link */}
+                  {!data.directDownload && (
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/15 rounded-xl p-4">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm text-amber-200 font-medium">Download langsung tidak tersedia</p>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            Terabox memerlukan login untuk menghasilkan link download. 
+                            Kamu bisa buka link di bawah, login ke Terabox, lalu download langsung dari sana.
+                          </p>
+                        </div>
+                      </div>
+
                       <a 
-                        href={data.previewUrl}
+                        href={data.originalUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-purple-600/10 text-purple-400 hover:bg-purple-600/20 hover:text-purple-300 border border-purple-500/20 transition-all font-medium text-sm"
+                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 hover:text-blue-300 border border-blue-500/20 transition-all font-medium text-sm"
                       >
-                        <Play className="w-4 h-4" />
-                        Preview
+                        <ExternalLink className="w-4 h-4" />
+                        Buka di Terabox
                       </a>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Reset Button */}
+                  <button
+                    onClick={handleReset}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white border border-white/10 transition-all text-sm font-medium"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Coba URL Lain
+                  </button>
                 </div>
               </motion.div>
             )}
