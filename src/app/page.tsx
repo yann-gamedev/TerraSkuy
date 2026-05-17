@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Download, Play, FileIcon, FileVideo, FileImage, FileArchive, ClipboardPaste, Link2, Loader2, Info, ExternalLink, AlertTriangle, RotateCcw } from 'lucide-react';
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  return error instanceof Error ? error.message : fallback;
+};
+
 const getFileIcon = (type: string) => {
   switch (type) {
     case 'video': return <FileVideo className="w-10 h-10 text-blue-400" />;
@@ -36,7 +40,7 @@ export default function Home() {
       const text = await navigator.clipboard.readText();
       setUrl(text);
       toast.success('URL berhasil ditempel!');
-    } catch (err) {
+    } catch {
       toast.error('Gagal mengakses clipboard. Coba paste manual.');
     }
   };
@@ -94,10 +98,11 @@ export default function Home() {
       } else {
         toast.info('File ditemukan. Download langsung memerlukan login Terabox.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, 'Gagal mengekstrak URL.');
       setStatus('error');
-      setErrorMsg(err.message || 'Gagal mengekstrak URL.');
-      toast.error(err.message || 'Gagal mengekstrak URL.');
+      setErrorMsg(message);
+      toast.error(message);
     }
   };
 
@@ -224,6 +229,8 @@ export default function Home() {
                     <div className="flex gap-3">
                       <a
                         href={data.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 hover:text-blue-300 border border-blue-500/20 transition-all font-medium text-sm"
                       >
                         <Download className="w-4 h-4" />

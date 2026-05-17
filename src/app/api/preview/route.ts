@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+const getErrorMessage = (error: unknown) => {
+  return error instanceof Error ? error.message : 'Unknown error';
+};
+
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -92,16 +96,16 @@ export async function GET(req: Request) {
         headers,
       });
 
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
       clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
+      if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
         return NextResponse.json({ error: 'Request timeout setelah 45 detik' }, { status: 504 });
       }
       throw fetchError;
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Preview Proxy Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error', details: getErrorMessage(error) }, { status: 500 });
   }
 }
